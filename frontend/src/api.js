@@ -1,4 +1,4 @@
-const API_BASE = "http://127.0.0.1:8000/api";
+const API_BASE = "http://10.196.241.106:8000/api";
 
 export const uploadAudio = async (file) => {
   const formData = new FormData();
