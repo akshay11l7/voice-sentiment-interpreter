@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
-import { UploadCloud, Mic } from 'lucide-react';
+import { UploadCloud } from 'lucide-react';
+import AudioRecorder from './AudioRecorder';
 
 export default function Uploader({ onFileSelect, isUploading }) {
   const fileInputRef = useRef(null);
@@ -19,11 +20,7 @@ export default function Uploader({ onFileSelect, isUploading }) {
       <h2 className="panel-title">Start New Analysis</h2>
       <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>Upload Audio or Record Voice</p>
       
-      {/* Voice Recorder placeholder - For Future */}
-      <div style={{ textAlign: 'center', marginBottom: 24 }}>
-        <Mic size={40} color="var(--accent-blue)" />
-        <p style={{ color: 'var(--accent-blue)', fontWeight: 500 }}>Microphone Feature Coming Soon</p>
-      </div>
+      <AudioRecorder onRecordingComplete={onFileSelect} isUploading={isUploading} />
 
       <div 
         className="dropzone" 

@@ -34,6 +34,7 @@ def upload_audio(file: UploadFile = File(...), db: Session = Depends(get_db)):
     Receives an audio file, transcribes it, analyzes sentiment, 
     stores the interaction in the database, and returns the result.
     """
+    print(f"--- Received request to upload file: {file.filename} ---")
     # 1. Save the uploaded file to a temporary location
     try:
         suffix = os.path.splitext(file.filename)[1]
@@ -67,6 +68,7 @@ def upload_audio(file: UploadFile = File(...), db: Session = Depends(get_db)):
         return db_interaction
         
     except Exception as e:
+        print(f"--- ERROR during upload/processing: {e} ---")
         raise HTTPException(status_code=500, detail=f"Error processing audio: {e}")
     finally:
         # Clean up the temporary file

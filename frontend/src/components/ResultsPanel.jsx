@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { PlayCircle, PauseCircle, Smile, Frown, Meh } from 'lucide-react';
+import { PlayCircle, PauseCircle, Smile, Frown, Meh, Download } from 'lucide-react';
 
 export default function ResultsPanel({ result, audioUrl }) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -66,6 +66,16 @@ export default function ResultsPanel({ result, audioUrl }) {
           )}
         </div>
         <div style={{ flex: 1, height: 40, backgroundImage: 'repeating-linear-gradient(90deg, var(--border-color), var(--border-color) 2px, transparent 2px, transparent 6px)', opacity: 0.5 }}></div>
+        {audioUrl && (
+          <a 
+            href={audioUrl} 
+            download={result.filename || "audio_recording.webm"} 
+            style={{ display: 'flex', cursor: 'pointer', marginLeft: 8 }} 
+            title="Download Audio"
+          >
+            <Download size={24} color="var(--text-secondary)" />
+          </a>
+        )}
       </div>
 
       <h3 style={{ fontSize: 16, color: 'var(--text-secondary)', marginBottom: 8 }}>Transcribed Text</h3>
