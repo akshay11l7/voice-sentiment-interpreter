@@ -4,6 +4,11 @@ from sqlalchemy.orm import Session
 import shutil
 import os
 import tempfile
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 from . import models, schemas
 from .database import engine, get_db
@@ -34,15 +39,26 @@ def upload_audio(file: UploadFile = File(...), db: Session = Depends(get_db)):
     Receives an audio file, transcribes it, analyzes sentiment, 
     stores the interaction in the database, and returns the result.
     """
-    print(f"--- Received request to upload file: {file.filename} ---")
+    logger.info(f"Received request to upload file: {file.filename} (Content-Type: {file.content_type})")
+    
+    # Validate file type
+    valid_content_types = ["audio/wav", "audio/x-wav", "audio/mp3", "audio/mpeg", "audio/webm", "video/webm"]
+    valid_extensions = [".wav", ".mp3", ".webm"]
+    
+    suffix = os.path.splitext(file.filename)[1].lower()
+    
+    if file.content_type not in valid_content_types and suffix not in valid_extensions:
+        logger.warning(f"Rejected unsupported file upload: {file.filename} ({file.content_type})")
+        raise HTTPException(status_code=400, detail="Unsupported file format. Please upload a WAV, MP3, or WEBM audio file.")
+
     # 1. Save the uploaded file to a temporary location
     try:
-        suffix = os.path.splitext(file.filename)[1]
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             shutil.copyfileobj(file.file, tmp)
             tmp_path = tmp.name
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Could not save file: {e}")
+        logger.error(f"Could not save file {file.filename}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Could not save file on the server.")
     finally:
         file.file.close()
 
@@ -68,8 +84,8 @@ def upload_audio(file: UploadFile = File(...), db: Session = Depends(get_db)):
         return db_interaction
         
     except Exception as e:
-        print(f"--- ERROR during upload/processing: {e} ---")
-        raise HTTPException(status_code=500, detail=f"Error processing audio: {e}")
+        logger.error(f"Error during upload/processing of {file.filename}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="An error occurred while processing the audio.")
     finally:
         # Clean up the temporary file
         if os.path.exists(tmp_path):

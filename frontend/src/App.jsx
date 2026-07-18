@@ -4,12 +4,17 @@ import ResultsPanel from './components/ResultsPanel';
 import HistoryList from './components/HistoryList';
 import { uploadAudio } from './api';
 import { LayoutDashboard, History, Settings, Search, Bell } from 'lucide-react';
+import Toast from './components/Toast';
 
 function App() {
   const [currentResult, setCurrentResult] = useState(null);
   const [currentAudioUrl, setCurrentAudioUrl] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [refreshHistory, setRefreshHistory] = useState(0);
+  const [toast, setToast] = useState({ message: '', type: '' });
+
+  const showError = (msg) => setToast({ message: msg, type: 'error' });
+  const showSuccess = (msg) => setToast({ message: msg, type: 'success' });
 
   const handleFileUpload = async (file) => {
     try {
@@ -19,8 +24,9 @@ function App() {
       if (currentAudioUrl) URL.revokeObjectURL(currentAudioUrl); // Clean up previous
       setCurrentAudioUrl(URL.createObjectURL(file));
       setRefreshHistory(prev => prev + 1);
+      showSuccess("Audio successfully processed!");
     } catch (error) {
-      alert("Error processing file: " + error.message);
+      showError("Error processing file: " + error.message);
     } finally {
       setIsUploading(false);
     }
@@ -65,7 +71,11 @@ function App() {
         <div className="dashboard-grid">
           {/* Left Column */}
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <Uploader onFileSelect={handleFileUpload} isUploading={isUploading} />
+            <Uploader 
+              onFileSelect={handleFileUpload} 
+              isUploading={isUploading} 
+              onError={showError} 
+            />
             <HistoryList refreshTrigger={refreshHistory} />
           </div>
 
@@ -75,6 +85,12 @@ function App() {
           </div>
         </div>
       </main>
+
+      <Toast 
+        message={toast.message} 
+        type={toast.type} 
+        onClose={() => setToast({ message: '', type: '' })} 
+      />
     </div>
   );
 }

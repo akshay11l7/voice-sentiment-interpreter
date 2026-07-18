@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:8000/api";
+export const API_BASE = "/api";
 
 export const uploadAudio = async (file) => {
   const formData = new FormData();
