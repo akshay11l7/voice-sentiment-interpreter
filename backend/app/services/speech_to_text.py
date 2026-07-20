@@ -5,10 +5,10 @@ import os
 # Suppress some common warnings from PyTorch/Whisper for a cleaner log
 warnings.filterwarnings("ignore", message="FP16 is not supported on CPU; using FP32 instead")
 
-print("Loading Whisper model (tiny) into memory... This may take a moment on first run.")
+print("Loading Whisper model (small) into memory... This may take a moment on first run.")
 # Load the model once when the module is imported
 # 'tiny' is used for speed. Can be changed to 'base' or 'small' for better accuracy.
-model = whisper.load_model("tiny")
+model = whisper.load_model("small")
 print("Whisper model loaded successfully.")
 
 def transcribe_audio(file_path: str, task: str = "transcribe") -> str:
