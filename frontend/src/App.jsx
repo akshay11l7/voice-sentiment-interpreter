@@ -16,10 +16,10 @@ function App() {
   const showError = (msg) => setToast({ message: msg, type: 'error' });
   const showSuccess = (msg) => setToast({ message: msg, type: 'success' });
 
-  const handleFileUpload = async (file) => {
+  const handleFileUpload = async (file, task = 'transcribe') => {
     try {
       setIsUploading(true);
-      const result = await uploadAudio(file);
+      const result = await uploadAudio(file, task);
       setCurrentResult(result);
       if (currentAudioUrl) URL.revokeObjectURL(currentAudioUrl); // Clean up previous
       setCurrentAudioUrl(URL.createObjectURL(file));

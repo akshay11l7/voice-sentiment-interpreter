@@ -1,8 +1,9 @@
 export const API_BASE = "/api";
 
-export const uploadAudio = async (file) => {
+export const uploadAudio = async (file, task = "transcribe") => {
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("task", task);
   
   const response = await fetch(`${API_BASE}/upload`, {
     method: "POST",

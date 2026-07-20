@@ -11,16 +11,16 @@ print("Loading Whisper model (tiny) into memory... This may take a moment on fir
 model = whisper.load_model("tiny")
 print("Whisper model loaded successfully.")
 
-def transcribe_audio(file_path: str) -> str:
+def transcribe_audio(file_path: str, task: str = "transcribe") -> str:
     """
-    Transcribes an audio file at the given path using OpenAI Whisper.
-    Returns the transcribed text.
+    Transcribes (or translates) an audio file at the given path using OpenAI Whisper.
+    Returns the resulting text.
     """
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"Audio file not found: {file_path}")
 
-    # Transcribe the audio file
-    result = model.transcribe(file_path)
+    # Transcribe or translate the audio file
+    result = model.transcribe(file_path, task=task)
     return result["text"].strip()
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 import shutil
@@ -34,7 +34,7 @@ def read_root():
     return {"message": "Welcome to the Voice-to-Text and Sentiment Interpreter API"}
 
 @app.post("/api/upload", response_model=schemas.InteractionResponse)
-def upload_audio(file: UploadFile = File(...), db: Session = Depends(get_db)):
+def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), db: Session = Depends(get_db)):
     """
     Receives an audio file, transcribes it, analyzes sentiment, 
     stores the interaction in the database, and returns the result.
@@ -64,7 +64,7 @@ def upload_audio(file: UploadFile = File(...), db: Session = Depends(get_db)):
 
     try:
         # 2. Transcribe the audio
-        transcription = transcribe_audio(tmp_path)
+        transcription = transcribe_audio(tmp_path, task=task)
         
         # 3. Analyze Sentiment
         sentiment_result = analyze_sentiment(transcription)

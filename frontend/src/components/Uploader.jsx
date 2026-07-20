@@ -1,9 +1,10 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { UploadCloud, Info } from 'lucide-react';
 import AudioRecorder from './AudioRecorder';
 
 export default function Uploader({ onFileSelect, isUploading, onError }) {
   const fileInputRef = useRef(null);
+  const [task, setTask] = useState('transcribe');
 
   const validateAndSelectFile = (file) => {
     if (!file) return;
@@ -17,7 +18,7 @@ export default function Uploader({ onFileSelect, isUploading, onError }) {
       return;
     }
     
-    onFileSelect(file);
+    onFileSelect(file, task);
   };
 
   const handleDrop = (e) => {
@@ -35,7 +36,29 @@ export default function Uploader({ onFileSelect, isUploading, onError }) {
       <h2 className="panel-title">Start New Analysis</h2>
       <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>Upload Audio or Record Voice</p>
       
-      <AudioRecorder onRecordingComplete={onFileSelect} isUploading={isUploading} />
+      <div style={{ marginBottom: 20 }}>
+        <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>Select Task:</label>
+        <select 
+          value={task} 
+          onChange={(e) => setTask(e.target.value)}
+          style={{
+            padding: '8px 12px',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border-color)',
+            backgroundColor: 'var(--bg-color)',
+            color: 'var(--text-primary)',
+            fontSize: '15px',
+            width: '100%',
+            outline: 'none'
+          }}
+          disabled={isUploading}
+        >
+          <option value="transcribe">Transcribe (Detect Language)</option>
+          <option value="translate">Translate (Any Language to English)</option>
+        </select>
+      </div>
+
+      <AudioRecorder onRecordingComplete={(file) => onFileSelect(file, task)} isUploading={isUploading} />
 
       <div 
         className="dropzone" 
