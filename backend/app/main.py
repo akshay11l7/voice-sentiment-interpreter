@@ -14,6 +14,7 @@ from . import models, schemas
 from .database import engine, get_db
 from .services.speech_to_text import transcribe_audio
 from .services.sentiment import analyze_sentiment
+from .services.audio_processing import reduce_noise
 
 # Create tables if they don't exist
 models.Base.metadata.create_all(bind=engine)
@@ -62,9 +63,17 @@ def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), d
     finally:
         file.file.close()
 
-    try:
+        # 1.5 Apply noise reduction
+        clean_tmp_path = tmp_path.replace(suffix, f"_clean{suffix}") # Try to keep same suffix or .wav
+        try:
+            reduce_noise(tmp_path, clean_tmp_path)
+            process_path = clean_tmp_path
+        except Exception as e:
+            logger.warning(f"Noise reduction failed, proceeding with original audio: {e}")
+            process_path = tmp_path
+
         # 2. Transcribe the audio
-        transcription = transcribe_audio(tmp_path, task=task)
+        transcription = transcribe_audio(process_path, task=task)
         
         # 3. Analyze Sentiment
         sentiment_result = analyze_sentiment(transcription)
@@ -87,9 +96,11 @@ def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), d
         logger.error(f"Error during upload/processing of {file.filename}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An error occurred while processing the audio.")
     finally:
-        # Clean up the temporary file
+        # Clean up the temporary files
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
+        if 'clean_tmp_path' in locals() and os.path.exists(clean_tmp_path):
+            os.remove(clean_tmp_path)
 
 @app.get("/api/interactions", response_model=list[schemas.InteractionResponse])
 def get_interactions(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
