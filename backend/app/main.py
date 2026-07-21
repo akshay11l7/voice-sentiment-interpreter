@@ -63,6 +63,7 @@ def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), d
     finally:
         file.file.close()
 
+    try:
         # 1.5 Apply noise reduction
         clean_tmp_path = tmp_path.replace(suffix, f"_clean{suffix}") # Try to keep same suffix or .wav
         try:
