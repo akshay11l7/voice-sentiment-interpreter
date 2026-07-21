@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { PlayCircle, PauseCircle, Smile, Frown, Meh, Download } from 'lucide-react';
+import { PlayCircle, PauseCircle, Smile, Frown, Meh, Download, AlertCircle, AlertTriangle } from 'lucide-react';
 
 export default function ResultsPanel({ result, audioUrl }) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -43,6 +43,10 @@ export default function ResultsPanel({ result, audioUrl }) {
     switch(sentiment_label.toLowerCase()) {
       case 'happy': return { className: 'happy', icon: <Smile size={32} /> };
       case 'sad': return { className: 'sad', icon: <Frown size={32} /> };
+      case 'angry': return { className: 'angry', icon: <AlertCircle size={32} /> };
+      case 'fear': return { className: 'fear', icon: <AlertTriangle size={32} /> };
+      case 'disgust': return { className: 'disgust', icon: <Frown size={32} /> };
+      case 'surprise': return { className: 'surprise', icon: <Smile size={32} /> };
       default: return { className: 'neutral', icon: <Meh size={32} /> };
     }
   };

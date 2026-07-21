@@ -1,42 +1,58 @@
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from transformers import pipeline
+import logging
 
-analyzer = SentimentIntensityAnalyzer()
+logger = logging.getLogger(__name__)
+
+logger.info("Loading HuggingFace Emotion Classifier (j-hartmann/emotion-english-distilroberta-base)...")
+classifier = pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base")
+logger.info("Emotion Classifier loaded successfully.")
+
+# Map HuggingFace labels to our desired frontend labels
+LABEL_MAP = {
+    "anger": "Angry",
+    "disgust": "Disgust",
+    "fear": "Fear",
+    "joy": "Happy",
+    "neutral": "Neutral",
+    "sadness": "Sad",
+    "surprise": "Surprise"
+}
 
 def analyze_sentiment(text: str) -> dict:
     """
-    Analyzes the sentiment of a given text and returns a dictionary with the score and label.
-    Score ranges from -1.0 (most negative) to +1.0 (most positive).
+    Analyzes the emotion of a given text using a HuggingFace model.
+    Returns a dictionary with the confidence score and the emotion label.
     """
     if not text or not text.strip():
         return {"score": 0.0, "label": "Neutral"}
 
-    scores = analyzer.polarity_scores(text)
-    compound_score = scores['compound']
-    
-    # Classify as Happy or Sad based on compound score
-    # Usually compound >= 0.05 is positive, <= -0.05 is negative
-    if compound_score >= 0.05:
-        label = "Happy"
-    elif compound_score <= -0.05:
-        label = "Sad"
-    else:
-        label = "Neutral"
-
-    return {
-        "score": compound_score,
-        "label": label
-    }
+    try:
+        # Truncate text roughly to avoid max token length issues
+        truncated_text = text[:1500] 
+        result = classifier(truncated_text)[0]
+        raw_label = result['label']
+        score = result['score']
+        
+        return {
+            "score": round(score, 4),
+            "label": LABEL_MAP.get(raw_label, "Neutral")
+        }
+    except Exception as e:
+        logger.error(f"Error during sentiment analysis: {e}", exc_info=True)
+        return {"score": 0.0, "label": "Neutral"}
 
 if __name__ == "__main__":
     import sys
-    print("--- Sentiment Analysis Module Test ---")
+    print("--- Emotion Analysis Module Test ---")
     test_strings = [
         "I am so happy and thrilled with the service!",
         "This is the worst experience I have ever had.",
-        "The product is okay, nothing special."
+        "The product is okay, nothing special.",
+        "I can't believe you did this to me, I'm furious!"
     ]
     
     for s in test_strings:
         result = analyze_sentiment(s)
         print(f"Text: '{s}'")
         print(f"Result: {result}\n")
+

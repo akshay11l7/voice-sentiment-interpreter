@@ -3,6 +3,10 @@ uvicorn
 sqlalchemy
 pydantic
 openai-whisper
-vaderSentiment
 textblob
 python-multipart
+transformers
+torch
+noisereduce
+librosa
+soundfile
