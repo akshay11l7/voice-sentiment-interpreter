@@ -10,3 +10,6 @@ torch
 noisereduce
 librosa
 soundfile
+pyannote.audio
+torchaudio
+python-dotenv

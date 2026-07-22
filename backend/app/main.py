@@ -15,6 +15,8 @@ from .database import engine, get_db
 from .services.speech_to_text import transcribe_audio
 from .services.sentiment import analyze_sentiment
 from .services.audio_processing import reduce_noise
+from .services.diarization import diarize_audio
+import json
 
 # Create tables if they don't exist
 models.Base.metadata.create_all(bind=engine)
@@ -73,19 +75,73 @@ def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), d
             logger.warning(f"Noise reduction failed, proceeding with original audio: {e}")
             process_path = tmp_path
 
-        # 2. Transcribe the audio
-        transcription = transcribe_audio(process_path, task=task)
+        # 2. Transcribe the audio (now returns full dict with segments)
+        transcription_result = transcribe_audio(process_path, task=task)
+        whisper_text = transcription_result["text"].strip()
+        whisper_segments = transcription_result.get("segments", [])
+
+        # 3. Diarize the audio
+        diarization_result = diarize_audio(process_path)
+
+        # 4. Align Whisper segments with Diarization and analyze sentiment per segment
+        aligned_segments = []
+        for w_seg in whisper_segments:
+            w_start = w_seg["start"]
+            w_end = w_seg["end"]
+            w_text = w_seg["text"].strip()
+            if not w_text:
+                continue
+
+            best_speaker = "Unknown"
+            max_overlap = 0
+            for d_seg in diarization_result:
+                d_start = d_seg["start"]
+                d_end = d_seg["end"]
+                
+                overlap_start = max(w_start, d_start)
+                overlap_end = min(w_end, d_end)
+                overlap = max(0, overlap_end - overlap_start)
+                
+                if overlap > max_overlap:
+                    max_overlap = overlap
+                    best_speaker = d_seg["speaker"]
+            
+            # Analyze sentiment for this segment
+            seg_sentiment = analyze_sentiment(w_text)
+            
+            aligned_segments.append({
+                "speaker": best_speaker,
+                "start": w_start,
+                "end": w_end,
+                "text": w_text,
+                "sentiment": seg_sentiment["label"],
+                "sentiment_score": seg_sentiment["score"]
+            })
+
+        # 5. Calculate Metrics
+        overall_sentiment_result = analyze_sentiment(whisper_text)
         
-        # 3. Analyze Sentiment
-        sentiment_result = analyze_sentiment(transcription)
+        if aligned_segments:
+            total_score = sum(s["sentiment_score"] for s in aligned_segments)
+            avg_score = total_score / len(aligned_segments)
+        else:
+            avg_score = overall_sentiment_result["score"]
+            
+        # Map average score (-1.0 to 1.0) to a 1.0 - 10.0 scale for client satisfaction
+        client_satisfaction = round((avg_score + 1.0) * 4.5 + 1.0, 1)
         
-        # 4. Save to Database
+        diarization_json = json.dumps(aligned_segments)
+        
+        # 6. Save to Database
         db_interaction = models.Interaction(
             filename=file.filename,
-            duration_seconds=0.0, # Optionally calculate duration later using librosa or wave
-            transcription=transcription,
-            sentiment_score=sentiment_result["score"],
-            sentiment_label=sentiment_result["label"]
+            duration_seconds=0.0,
+            transcription=whisper_text,
+            sentiment_score=avg_score,
+            sentiment_label=overall_sentiment_result["label"],
+            average_sentiment=avg_score,
+            client_satisfaction=client_satisfaction,
+            diarization_data=diarization_json
         )
         db.add(db_interaction)
         db.commit()

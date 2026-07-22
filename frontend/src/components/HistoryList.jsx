@@ -39,12 +39,21 @@ export default function HistoryList({ refreshTrigger }) {
             <tr>
               <th>Recording</th>
               <th>Status</th>
+              <th>CSAT</th>
               <th>Date</th>
               <th style={{ width: 40 }}></th>
             </tr>
           </thead>
           <tbody>
-            {history.slice(0, 5).map((item) => (
+            {history.slice(0, 5).map((item) => {
+              let parsedDiarization = [];
+              try {
+                if (item.diarization_data) {
+                  parsedDiarization = JSON.parse(item.diarization_data);
+                }
+              } catch (e) {}
+              
+              return (
               <React.Fragment key={item.id}>
                 <tr 
                   onClick={() => {
@@ -58,6 +67,7 @@ export default function HistoryList({ refreshTrigger }) {
                     <span className={`status-dot ${item.sentiment_label.toLowerCase()}`}></span>
                     {item.sentiment_label}
                   </td>
+                  <td>{item.client_satisfaction !== null && item.client_satisfaction !== undefined ? `${item.client_satisfaction}/10` : 'N/A'}</td>
                   <td>{new Date(item.created_at).toLocaleDateString()}</td>
                   <td style={{ textAlign: 'right' }}>
                     <Trash2 
@@ -73,12 +83,20 @@ export default function HistoryList({ refreshTrigger }) {
                 </tr>
                 {expandedId === item.id && (
                   <tr>
-                    <td colSpan="4" style={{ padding: '16px 24px', backgroundColor: 'var(--bg-color)', borderBottom: '1px solid var(--border-color)' }}>
+                    <td colSpan="5" style={{ padding: '16px 24px', backgroundColor: 'var(--bg-color)', borderBottom: '1px solid var(--border-color)' }}>
                       {showTranscriptId === item.id ? (
                         <>
                           <strong style={{ display: 'block', marginBottom: '8px', color: 'var(--text-primary)' }}>Transcription:</strong>
                           <div style={{ color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', fontSize: '14px', lineHeight: '1.6' }}>
-                            {item.transcription || <em>No transcription available.</em>}
+                            {parsedDiarization.length > 0 ? (
+                              parsedDiarization.map((seg, i) => (
+                                <div key={i} style={{ marginBottom: '8px' }}>
+                                  <strong>{seg.speaker}:</strong> {seg.text} <span style={{fontSize: '11px', opacity: 0.7}}>({seg.sentiment})</span>
+                                </div>
+                              ))
+                            ) : (
+                              item.transcription || <em>No transcription available.</em>
+                            )}
                           </div>
                         </>
                       ) : (
@@ -96,7 +114,7 @@ export default function HistoryList({ refreshTrigger }) {
                   </tr>
                 )}
               </React.Fragment>
-            ))}
+            )})}
           </tbody>
         </table>
       )}

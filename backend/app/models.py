@@ -11,4 +11,7 @@ class Interaction(Base):
     transcription = Column(String, nullable=True)
     sentiment_score = Column(Float, nullable=True) # Float from -1.0 (sad) to 1.0 (happy)
     sentiment_label = Column(String, nullable=True) # "Happy" or "Sad"
+    average_sentiment = Column(Float, nullable=True)
+    client_satisfaction = Column(Float, nullable=True) # 1.0 to 10.0 scale
+    diarization_data = Column(String, nullable=True) # JSON string of segments
     created_at = Column(DateTime, default=datetime.utcnow)

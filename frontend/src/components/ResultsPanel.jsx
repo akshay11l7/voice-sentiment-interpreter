@@ -39,6 +39,15 @@ export default function ResultsPanel({ result, audioUrl }) {
 
   const { filename, transcription, sentiment_score, sentiment_label } = result;
 
+  let parsedDiarization = [];
+  try {
+    if (result.diarization_data) {
+      parsedDiarization = JSON.parse(result.diarization_data);
+    }
+  } catch (e) {
+    console.error("Failed to parse diarization data:", e);
+  }
+
   const getSentimentConfig = () => {
     switch(sentiment_label.toLowerCase()) {
       case 'happy': return { className: 'happy', icon: <Smile size={32} /> };
@@ -82,21 +91,52 @@ export default function ResultsPanel({ result, audioUrl }) {
         )}
       </div>
 
-      <h3 style={{ fontSize: 16, color: 'var(--text-secondary)', marginBottom: 8 }}>Transcribed Text</h3>
-      <div className="transcription-box">
-        {transcription || "No speech detected in this audio."}
-      </div>
-
-      <h3 style={{ fontSize: 16, color: 'var(--text-secondary)', marginBottom: 8 }}>Sentiment Analysis</h3>
+      <h3 style={{ fontSize: 16, color: 'var(--text-secondary)', marginBottom: 8 }}>Sentiment Analysis & Metrics</h3>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: 16 }}>
         <div>
-          <p style={{ fontSize: 18, fontWeight: 500 }}>Sentiment Score</p>
-          <p style={{ color: 'var(--text-secondary)' }}>Score: {sentiment_score}</p>
+          <p style={{ fontSize: 18, fontWeight: 500 }}>Overall Sentiment</p>
+          <p style={{ color: 'var(--text-secondary)' }}>Score: {result.average_sentiment !== null && result.average_sentiment !== undefined ? result.average_sentiment : sentiment_score}</p>
         </div>
         <div className={`sentiment-badge ${sentimentConfig.className}`}>
           {sentimentConfig.icon}
           {sentiment_label.toUpperCase()}
         </div>
+      </div>
+
+      {result.client_satisfaction !== null && result.client_satisfaction !== undefined && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: 16, marginTop: 16 }}>
+            <div>
+            <p style={{ fontSize: 18, fontWeight: 500 }}>Client Satisfaction Score</p>
+            <p style={{ color: 'var(--text-secondary)' }}>Based on conversation sentiment</p>
+            </div>
+            <div style={{ fontSize: 24, fontWeight: 'bold', color: 'var(--accent-blue)' }}>
+            {result.client_satisfaction} / 10
+            </div>
+        </div>
+      )}
+
+      <h3 style={{ fontSize: 16, color: 'var(--text-secondary)', marginTop: 24, marginBottom: 8 }}>Conversation Transcript</h3>
+      <div className="transcription-box" style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '400px', overflowY: 'auto' }}>
+        {parsedDiarization.length > 0 ? (
+          parsedDiarization.map((segment, idx) => (
+            <div key={idx} style={{ 
+              padding: '12px', 
+              borderRadius: '8px', 
+              backgroundColor: segment.speaker === 'SPEAKER_00' ? 'rgba(0, 112, 243, 0.1)' : 'var(--bg-color)',
+              border: '1px solid var(--border-color)',
+              alignSelf: segment.speaker === 'SPEAKER_00' ? 'flex-end' : 'flex-start',
+              width: '80%'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                <strong>{segment.speaker}</strong>
+                <span>{segment.sentiment} ({segment.sentiment_score.toFixed(2)})</span>
+              </div>
+              <div style={{ lineHeight: '1.5' }}>{segment.text}</div>
+            </div>
+          ))
+        ) : (
+          <div>{transcription || "No speech detected in this audio."}</div>
+        )}
       </div>
     </div>
   );

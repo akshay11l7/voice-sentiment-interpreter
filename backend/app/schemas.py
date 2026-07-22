@@ -8,6 +8,9 @@ class InteractionBase(BaseModel):
     transcription: Optional[str] = None
     sentiment_score: Optional[float] = None
     sentiment_label: Optional[str] = None
+    average_sentiment: Optional[float] = None
+    client_satisfaction: Optional[float] = None
+    diarization_data: Optional[str] = None
 
 class InteractionResponse(InteractionBase):
     id: int
