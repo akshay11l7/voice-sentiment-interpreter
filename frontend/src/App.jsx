@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Uploader from './components/Uploader';
 import ResultsPanel from './components/ResultsPanel';
 import HistoryList from './components/HistoryList';
 import { uploadAudio } from './api';
-import { LayoutDashboard, History, Settings, Search, Bell } from 'lucide-react';
+import { LayoutDashboard, History, Settings, Search, Bell, LogOut } from 'lucide-react';
 import Toast from './components/Toast';
+import ThemeToggle from './components/ThemeToggle';
+import AuthPage from './components/AuthPage';
 
 function App() {
   const [currentResult, setCurrentResult] = useState(null);
@@ -12,6 +14,15 @@ function App() {
   const [isUploading, setIsUploading] = useState(false);
   const [refreshHistory, setRefreshHistory] = useState(0);
   const [toast, setToast] = useState({ message: '', type: '' });
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
+  const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('isAuthenticated') === 'true');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
   const showError = (msg) => setToast({ message: msg, type: 'error' });
   const showSuccess = (msg) => setToast({ message: msg, type: 'success' });
@@ -31,6 +42,24 @@ function App() {
       setIsUploading(false);
     }
   };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('token');
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="app-container">
+        <AuthPage onLogin={(token) => {
+          setIsAuthenticated(true);
+          localStorage.setItem('isAuthenticated', 'true');
+          localStorage.setItem('token', token);
+        }} />
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">
@@ -52,7 +81,12 @@ function App() {
             <Settings size={20} />
             Settings
           </a>
+          <a href="#" className="nav-item" onClick={handleLogout} style={{ marginTop: 'auto', color: 'var(--error-color)' }}>
+            <LogOut size={20} />
+            Logout
+          </a>
         </div>
+        <ThemeToggle theme={theme} onToggle={toggleTheme} />
       </aside>
 
       {/* Main Content */}

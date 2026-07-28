@@ -1,4 +1,5 @@
-from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 import shutil
@@ -12,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 from . import models, schemas
 from .database import engine, get_db
+from .auth import SECRET_KEY, ALGORITHM, create_access_token, get_password_hash, verify_password, ACCESS_TOKEN_EXPIRE_MINUTES
+from jose import JWTError, jwt
+from datetime import timedelta
 from .services.speech_to_text import transcribe_audio
 from .services.sentiment import analyze_sentiment
 from .services.audio_processing import reduce_noise
@@ -36,8 +40,53 @@ app.add_middleware(
 def read_root():
     return {"message": "Welcome to the Voice-to-Text and Sentiment Interpreter API"}
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if user is None:
+        raise credentials_exception
+    return user
+
+@app.post("/api/register", response_model=schemas.UserResponse)
+def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    db_user = db.query(models.User).filter(models.User.email == user.email).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    hashed_password = get_password_hash(user.password)
+    db_user = models.User(email=user.email, hashed_password=hashed_password, full_name=user.full_name)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+@app.post("/api/login", response_model=schemas.Token)
+def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == form_data.username).first()
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Incorrect email or password", headers={"WWW-Authenticate": "Bearer"})
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(data={"sub": user.email}, expires_delta=access_token_expires)
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.get("/api/me", response_model=schemas.UserResponse)
+def read_users_me(current_user: models.User = Depends(get_current_user)):
+    return current_user
+
 @app.post("/api/upload", response_model=schemas.InteractionResponse)
-def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), db: Session = Depends(get_db)):
+def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """
     Receives an audio file, transcribes it, analyzes sentiment, 
     stores the interaction in the database, and returns the result.
@@ -153,6 +202,7 @@ def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), d
         
         # 6. Save to Database
         db_interaction = models.Interaction(
+            user_id=current_user.id,
             filename=file.filename,
             duration_seconds=0.0,
             transcription=whisper_text,
@@ -181,21 +231,21 @@ def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), d
             os.remove(wav_tmp_path)
 
 @app.get("/api/interactions", response_model=list[schemas.InteractionResponse])
-def get_interactions(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def get_interactions(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """
-    Fetches historical interactions from the database.
+    Fetches historical interactions for the logged in user from the database.
     """
-    interactions = db.query(models.Interaction).order_by(models.Interaction.created_at.desc()).offset(skip).limit(limit).all()
+    interactions = db.query(models.Interaction).filter(models.Interaction.user_id == current_user.id).order_by(models.Interaction.created_at.desc()).offset(skip).limit(limit).all()
     return interactions
 
 @app.delete("/api/interactions/{interaction_id}")
-def delete_interaction(interaction_id: int, db: Session = Depends(get_db)):
+def delete_interaction(interaction_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """
-    Deletes a historical interaction from the database.
+    Deletes a historical interaction from the database (only if owned by current user).
     """
-    interaction = db.query(models.Interaction).filter(models.Interaction.id == interaction_id).first()
+    interaction = db.query(models.Interaction).filter(models.Interaction.id == interaction_id, models.Interaction.user_id == current_user.id).first()
     if not interaction:
-        raise HTTPException(status_code=404, detail="Interaction not found")
+        raise HTTPException(status_code=404, detail="Interaction not found or you don't have permission to delete it")
     db.delete(interaction)
     db.commit()
     return {"message": "Interaction deleted successfully"}

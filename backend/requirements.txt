@@ -13,3 +13,4 @@ soundfile
 pyannote.audio
 torchaudio
 python-dotenv
+passlib[bcrypt]\npython-jose[cryptography]\nbcrypt
