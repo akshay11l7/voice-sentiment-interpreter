@@ -16,7 +16,7 @@ if not hf_token:
 try:
     pipeline = Pipeline.from_pretrained(
         "pyannote/speaker-diarization-3.1",
-        use_auth_token=hf_token
+        token=hf_token
     )
     
     # Send pipeline to GPU if available
@@ -39,7 +39,15 @@ def diarize_audio(file_path: str) -> list:
         return []
         
     try:
-        diarization = pipeline(file_path)
+        # min_speakers=2 helps the model distinguish similar-sounding speakers
+        result = pipeline(file_path, min_speakers=2)
+        
+        # pyannote v4 returns a DiarizeOutput dataclass; extract the Annotation
+        if hasattr(result, 'speaker_diarization'):
+            diarization = result.speaker_diarization
+        else:
+            diarization = result
+        
         segments = []
         for turn, _, speaker in diarization.itertracks(yield_label=True):
             segments.append({
@@ -47,6 +55,7 @@ def diarize_audio(file_path: str) -> list:
                 "end": turn.end,
                 "speaker": speaker
             })
+        logger.info(f"Diarization complete: found {len(segments)} segments.")
         return segments
     except Exception as e:
         logger.error(f"Error during diarization: {e}", exc_info=True)

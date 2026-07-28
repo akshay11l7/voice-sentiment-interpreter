@@ -80,11 +80,24 @@ def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), d
         whisper_text = transcription_result["text"].strip()
         whisper_segments = transcription_result.get("segments", [])
 
-        # 3. Diarize the audio
-        diarization_result = diarize_audio(process_path)
+        # 3. Convert to WAV for diarization (PyAnnote needs precise sample counts)
+        wav_tmp_path = process_path.rsplit('.', 1)[0] + '_diarize.wav'
+        try:
+            import subprocess
+            subprocess.run(
+                ['ffmpeg', '-y', '-i', process_path, '-ar', '16000', '-ac', '1', wav_tmp_path],
+                capture_output=True, check=True
+            )
+            diarize_path = wav_tmp_path
+        except Exception as e:
+            logger.warning(f"WAV conversion for diarization failed, using original: {e}")
+            diarize_path = process_path
+        
+        diarization_result = diarize_audio(diarize_path)
 
         # 4. Align Whisper segments with Diarization and analyze sentiment per segment
         aligned_segments = []
+        context_buffer = []  # Keep track of up to 3 segments (2 context + 1 current)
         for w_seg in whisper_segments:
             w_start = w_seg["start"]
             w_end = w_seg["end"]
@@ -106,8 +119,14 @@ def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), d
                     max_overlap = overlap
                     best_speaker = d_seg["speaker"]
             
-            # Analyze sentiment for this segment
-            seg_sentiment = analyze_sentiment(w_text)
+            # Context-Windowing: Append current text, trim to max 3 items
+            context_buffer.append(w_text)
+            if len(context_buffer) > 3:
+                context_buffer.pop(0)
+            
+            # Analyze sentiment for this segment using the combined context
+            context_text = " ".join(context_buffer)
+            seg_sentiment = analyze_sentiment(context_text)
             
             aligned_segments.append({
                 "speaker": best_speaker,
@@ -158,6 +177,8 @@ def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), d
             os.remove(tmp_path)
         if 'clean_tmp_path' in locals() and os.path.exists(clean_tmp_path):
             os.remove(clean_tmp_path)
+        if 'wav_tmp_path' in locals() and os.path.exists(wav_tmp_path):
+            os.remove(wav_tmp_path)
 
 @app.get("/api/interactions", response_model=list[schemas.InteractionResponse])
 def get_interactions(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):

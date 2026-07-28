@@ -48,8 +48,9 @@ export default function ResultsPanel({ result, audioUrl }) {
     console.error("Failed to parse diarization data:", e);
   }
 
-  const getSentimentConfig = () => {
-    switch(sentiment_label.toLowerCase()) {
+  const getSentimentConfig = (labelParam) => {
+    const labelToUse = labelParam || sentiment_label;
+    switch(labelToUse.toLowerCase()) {
       case 'happy': return { className: 'happy', icon: <Smile size={32} /> };
       case 'sad': return { className: 'sad', icon: <Frown size={32} /> };
       case 'angry': return { className: 'angry', icon: <AlertCircle size={32} /> };
@@ -60,7 +61,46 @@ export default function ResultsPanel({ result, audioUrl }) {
     }
   };
 
-  const sentimentConfig = getSentimentConfig();
+  const sentimentConfig = getSentimentConfig(sentiment_label);
+
+  const speakerStats = {};
+  parsedDiarization.forEach(segment => {
+    const speaker = segment.speaker;
+    if (!speakerStats[speaker]) {
+      speakerStats[speaker] = { sentiments: {}, totalScore: 0, count: 0 };
+    }
+    speakerStats[speaker].totalScore += segment.sentiment_score;
+    speakerStats[speaker].count += 1;
+    speakerStats[speaker].sentiments[segment.sentiment] = (speakerStats[speaker].sentiments[segment.sentiment] || 0) + 1;
+  });
+
+  const formatSpeakerName = (speaker) => {
+    if (speaker.startsWith('SPEAKER_')) {
+      const num = parseInt(speaker.split('_')[1], 10);
+      return `Speaker ${num + 1}`;
+    }
+    return speaker;
+  };
+
+  const speakerMetrics = Object.keys(speakerStats).map(speaker => {
+    const stats = speakerStats[speaker];
+    const avgScore = (stats.totalScore / stats.count).toFixed(2);
+    let maxSentiment = 'Neutral';
+    let maxCount = 0;
+    for (const [sentiment, count] of Object.entries(stats.sentiments)) {
+      if (count > maxCount) {
+        maxCount = count;
+        maxSentiment = sentiment;
+      }
+    }
+    
+    return {
+      originalId: speaker,
+      displayName: formatSpeakerName(speaker),
+      avgScore,
+      primarySentiment: maxSentiment
+    };
+  });
 
   return (
     <div className="panel">
@@ -92,7 +132,7 @@ export default function ResultsPanel({ result, audioUrl }) {
       </div>
 
       <h3 style={{ fontSize: 16, color: 'var(--text-secondary)', marginBottom: 8 }}>Sentiment Analysis & Metrics</h3>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: 16, paddingBottom: 16 }}>
         <div>
           <p style={{ fontSize: 18, fontWeight: 500 }}>Overall Sentiment</p>
           <p style={{ color: 'var(--text-secondary)' }}>Score: {result.average_sentiment !== null && result.average_sentiment !== undefined ? result.average_sentiment : sentiment_score}</p>
@@ -102,6 +142,22 @@ export default function ResultsPanel({ result, audioUrl }) {
           {sentiment_label.toUpperCase()}
         </div>
       </div>
+
+      {speakerMetrics.length > 0 && speakerMetrics.map(speaker => {
+        const config = getSentimentConfig(speaker.primarySentiment);
+        return (
+          <div key={speaker.originalId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: 16, paddingBottom: 16 }}>
+            <div>
+              <p style={{ fontSize: 16, fontWeight: 500 }}>{speaker.displayName}</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Avg Score: {speaker.avgScore}</p>
+            </div>
+            <div className={`sentiment-badge ${config.className}`} style={{ transform: 'scale(0.85)', transformOrigin: 'right center' }}>
+              {config.icon}
+              {speaker.primarySentiment.toUpperCase()}
+            </div>
+          </div>
+        );
+      })}
 
       {result.client_satisfaction !== null && result.client_satisfaction !== undefined && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: 16, marginTop: 16 }}>
@@ -128,7 +184,7 @@ export default function ResultsPanel({ result, audioUrl }) {
               width: '80%'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                <strong>{segment.speaker}</strong>
+                <strong>{formatSpeakerName(segment.speaker)}</strong>
                 <span>{segment.sentiment} ({segment.sentiment_score.toFixed(2)})</span>
               </div>
               <div style={{ lineHeight: '1.5' }}>{segment.text}</div>
