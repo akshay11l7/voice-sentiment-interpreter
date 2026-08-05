@@ -77,3 +77,13 @@ export const deleteInteraction = async (id) => {
   }
   return await response.json();
 };
+
+export const getAuditLogs = async () => {
+  const response = await fetch(`${API_BASE}/logs`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch audit logs: ${response.statusText}`);
+  }
+  return await response.json();
+};

@@ -70,6 +70,12 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
+
+    # Audit Log
+    log = models.AuditLog(user_id=db_user.id, action_type="REGISTER", description=f"Registered account for {user.email}")
+    db.add(log)
+    db.commit()
+
     return db_user
 
 @app.post("/api/login", response_model=schemas.Token)
@@ -79,6 +85,12 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
         raise HTTPException(status_code=401, detail="Incorrect email or password", headers={"WWW-Authenticate": "Bearer"})
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(data={"sub": user.email}, expires_delta=access_token_expires)
+
+    # Audit Log
+    log = models.AuditLog(user_id=user.id, action_type="LOGIN", description=f"User logged in")
+    db.add(log)
+    db.commit()
+
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.get("/api/me", response_model=schemas.UserResponse)
@@ -216,6 +228,11 @@ def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), d
         db.commit()
         db.refresh(db_interaction)
         
+        # Audit Log
+        log = models.AuditLog(user_id=current_user.id, action_type="UPLOAD", description=f"Uploaded and processed {file.filename}")
+        db.add(log)
+        db.commit()
+
         return db_interaction
         
     except Exception as e:
@@ -247,5 +264,18 @@ def delete_interaction(interaction_id: int, db: Session = Depends(get_db), curre
     if not interaction:
         raise HTTPException(status_code=404, detail="Interaction not found or you don't have permission to delete it")
     db.delete(interaction)
+    
+    # Audit Log
+    log = models.AuditLog(user_id=current_user.id, action_type="DELETE", description=f"Deleted interaction {interaction.filename}")
+    db.add(log)
+
     db.commit()
     return {"message": "Interaction deleted successfully"}
+
+@app.get("/api/logs", response_model=list[schemas.AuditLogResponse])
+def get_audit_logs(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    """
+    Fetches action history (audit logs) for the logged in user from the database.
+    """
+    logs = db.query(models.AuditLog).filter(models.AuditLog.user_id == current_user.id).order_by(models.AuditLog.created_at.desc()).offset(skip).limit(limit).all()
+    return logs

@@ -13,6 +13,7 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     interactions = relationship("Interaction", back_populates="owner")
+    audit_logs = relationship("AuditLog", back_populates="owner")
 
 class Interaction(Base):
     __tablename__ = "interactions"
@@ -28,5 +29,15 @@ class Interaction(Base):
     client_satisfaction = Column(Float, nullable=True) # 1.0 to 10.0 scale
     diarization_data = Column(String, nullable=True) # JSON string of segments
     created_at = Column(DateTime, default=datetime.utcnow)
-    
     owner = relationship("User", back_populates="interactions")
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    action_type = Column(String, index=True, nullable=False) # e.g. "LOGIN", "UPLOAD", "DELETE"
+    description = Column(String, nullable=True) # e.g. "Uploaded file audio.wav"
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    owner = relationship("User", back_populates="audit_logs")

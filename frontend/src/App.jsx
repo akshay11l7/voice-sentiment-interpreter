@@ -7,10 +7,12 @@ import { LayoutDashboard, History, Settings, Search, Bell, LogOut } from 'lucide
 import Toast from './components/Toast';
 import ThemeToggle from './components/ThemeToggle';
 import AuthPage from './components/AuthPage';
+import AuditLogs from './components/AuditLogs';
+import { ShieldAlert } from 'lucide-react';
 
 function App() {
-  const [currentResult, setCurrentResult] = useState(null);
-  const [currentAudioUrl, setCurrentAudioUrl] = useState(null);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [currentResult, setCurrentResult] = useState(null);  const [currentAudioUrl, setCurrentAudioUrl] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [refreshHistory, setRefreshHistory] = useState(0);
   const [toast, setToast] = useState({ message: '', type: '' });
@@ -69,13 +71,17 @@ function App() {
           🎙️ AudioPro
         </div>
         <div className="nav-links">
-          <a href="#" className="nav-item active">
+          <a href="#" className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); setActiveTab('dashboard'); }}>
             <LayoutDashboard size={20} />
             Dashboard
           </a>
           <a href="#" className="nav-item">
             <History size={20} />
             All Recordings
+          </a>
+          <a href="#" className={`nav-item ${activeTab === 'logs' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); setActiveTab('logs'); }}>
+            <ShieldAlert size={20} />
+            Activity Logs
           </a>
           <a href="#" className="nav-item">
             <Settings size={20} />
@@ -92,7 +98,7 @@ function App() {
       {/* Main Content */}
       <main className="main-content">
         <header className="header">
-          <h1>Dashboard</h1>
+          <h1>{activeTab === 'dashboard' ? 'Dashboard' : 'Activity Logs'}</h1>
           <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
             <div className="search-bar">
               <Search size={18} color="var(--text-secondary)" />
@@ -102,22 +108,28 @@ function App() {
           </div>
         </header>
 
-        <div className="dashboard-grid">
-          {/* Left Column */}
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <Uploader 
-              onFileSelect={handleFileUpload} 
-              isUploading={isUploading} 
-              onError={showError} 
-            />
-            <HistoryList refreshTrigger={refreshHistory} />
-          </div>
+        {activeTab === 'dashboard' ? (
+          <div className="dashboard-grid">
+            {/* Left Column */}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <Uploader 
+                onFileSelect={handleFileUpload} 
+                isUploading={isUploading} 
+                onError={showError} 
+              />
+              <HistoryList refreshTrigger={refreshHistory} />
+            </div>
 
-          {/* Right Column */}
-          <div>
-            <ResultsPanel result={currentResult} audioUrl={currentAudioUrl} />
+            {/* Right Column */}
+            <div>
+              <ResultsPanel result={currentResult} audioUrl={currentAudioUrl} />
+            </div>
           </div>
-        </div>
+        ) : activeTab === 'logs' ? (
+          <div className="logs-view">
+            <AuditLogs />
+          </div>
+        ) : null}
       </main>
 
       <Toast 
