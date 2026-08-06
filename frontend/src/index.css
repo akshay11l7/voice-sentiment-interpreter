@@ -268,6 +268,8 @@ body {
   padding: 24px;
   box-shadow: var(--shadow-sm);
   margin-bottom: 24px;
+  backdrop-filter: blur(8px);
+  animation: slideUpFade 0.4s ease-out forwards;
 }
 
 .panel-title {
@@ -304,7 +306,7 @@ body {
   border-radius: var(--radius-md);
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: all 0.2s ease;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -312,6 +314,8 @@ body {
 
 .btn:hover {
   background-color: var(--accent-blue-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(34, 139, 230, 0.2);
 }
 
 .btn:disabled {
@@ -641,4 +645,41 @@ body {
 
 .auth-link:hover {
   text-decoration: underline;
+}
+
+/* --- UI/UX Optimizations --- */
+
+/* Animations */
+@keyframes slideUpFade {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dashboard-grid > *, .auth-card {
+  animation: slideUpFade 0.4s ease-out forwards;
+}
+
+/* Skeleton Loader */
+.skeleton {
+  background: linear-gradient(90deg, var(--border-color) 25%, var(--bg-color) 50%, var(--border-color) 75%);
+  background-size: 200% 100%;
+  animation: loading-skeleton 1.5s infinite;
+  border-radius: var(--radius-sm);
+  color: transparent !important;
+  pointer-events: none;
+}
+
+.skeleton * {
+  visibility: hidden;
+}
+
+@keyframes loading-skeleton {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }

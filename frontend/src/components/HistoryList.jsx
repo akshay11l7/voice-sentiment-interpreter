@@ -6,14 +6,18 @@ export default function HistoryList({ refreshTrigger }) {
   const [history, setHistory] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [showTranscriptId, setShowTranscriptId] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadHistory = async () => {
+      setIsLoading(true);
       try {
         const data = await fetchHistory();
         setHistory(data);
       } catch (error) {
         console.error(error);
+      } finally {
+        setIsLoading(false);
       }
     };
     loadHistory();
@@ -31,7 +35,30 @@ export default function HistoryList({ refreshTrigger }) {
   return (
     <div className="panel">
       <h2 className="panel-title">Upload History</h2>
-      {history.length === 0 ? (
+      {isLoading ? (
+        <table className="history-table">
+          <thead>
+            <tr>
+              <th>Recording</th>
+              <th>Status</th>
+              <th>CSAT</th>
+              <th>Date</th>
+              <th style={{ width: 40 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...Array(5)].map((_, idx) => (
+              <tr key={idx}>
+                <td><div className="skeleton" style={{ width: '120px', height: '20px' }}></div></td>
+                <td><div className="skeleton" style={{ width: '80px', height: '20px' }}></div></td>
+                <td><div className="skeleton" style={{ width: '40px', height: '20px' }}></div></td>
+                <td><div className="skeleton" style={{ width: '80px', height: '20px' }}></div></td>
+                <td><div className="skeleton" style={{ width: '20px', height: '20px' }}></div></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : history.length === 0 ? (
         <p style={{ color: 'var(--text-secondary)' }}>No interactions found.</p>
       ) : (
         <table className="history-table">
