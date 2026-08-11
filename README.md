@@ -1,77 +1,85 @@
 # Voice-to-Text and Sentiment Interpreter 🎙️
 
-An AI-powered, full-stack web application designed for customer service analytics. This platform allows users to upload customer interaction audio files, instantly transcribes them using OpenAI Whisper, and analyzes the conversational sentiment (Happy, Sad, Neutral) using VADER NLP.
+An AI-powered, full-stack web application designed for customer service analytics. This platform allows users to upload customer interaction audio files, instantly transcribes them using OpenAI Whisper, separates speakers using PyAnnote diarization, and analyzes conversational emotion using a HuggingFace RoBERTa model.
 
 ## 🚀 Tech Stack
-* **Frontend**: React, Vite, Vanilla CSS
+* **Frontend**: React, Vite, Vanilla CSS, Nginx
 * **Backend**: Python, FastAPI
-* **Database**: SQLite, SQLAlchemy
-* **AI & NLP**: OpenAI Whisper (`tiny` model), VADER Sentiment Intensity Analyzer
+* **Database**: PostgreSQL (Production) / SQLite (Local Dev), SQLAlchemy
+* **AI & NLP**: OpenAI Whisper, HuggingFace `distilroberta-base` (Emotion), PyAnnote Audio (Diarization)
+* **DevOps**: Docker, Docker Compose, pgAdmin
 
 ---
 
-## 🛠️ Setup Instructions
+## 🛠️ Production Setup (Docker)
 
-### 1. Backend Setup
-Navigate to the `backend` directory and set up the Python virtual environment:
+The application is fully containerized for easy deployment and scalability.
+
+### Prerequisites
+- Install [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/).
+- Obtain a HuggingFace Access Token (to download the PyAnnote models).
+
+### Installation
+1. Clone the repository and navigate to the project root.
+2. In the `backend` directory, create a `.env` file and add your HuggingFace token:
+   ```env
+   HF_AUTH_TOKEN=your_huggingface_token_here
+   ```
+3. Run the following command from the project root to build and start all services:
+   ```bash
+   docker-compose up --build -d
+   ```
+
+*Note: On the first boot, the backend container will download ~500MB of AI models. The database tables will not be created until this download finishes (typically 5-8 minutes depending on connection speed).*
+
+### Accessing the Services
+Once all containers are successfully running, you can access the following services in your browser:
+* **Web Application (React + Nginx):** `http://localhost`
+* **FastAPI Backend (Swagger API Docs):** `http://localhost:8000/docs`
+* **pgAdmin Database Dashboard:** `http://localhost:5050`
+  * **Login Email:** `admin@admin.com`
+  * **Password:** `admin`
+
+---
+
+## 💻 Local Development Setup (Without Docker)
+
+If you wish to develop without Docker or test the frontend rapidly, you can run the services locally. The backend will automatically fall back to an SQLite database if the PostgreSQL `DATABASE_URL` environment variable is not found.
+
+### Backend Setup
 ```bash
 cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-```
-Run the FastAPI server:
-```bash
 uvicorn app.main:app --reload
 ```
-*The API will be available at `http://localhost:8000` (Swagger UI at `/docs`).*
+*Note: You must have `ffmpeg` installed on your host system for audio processing.*
 
-### 2. Frontend Setup
-Navigate to the `frontend` directory and install the Node dependencies:
+### Frontend Setup
 ```bash
 cd frontend
 npm install
-```
-Start the Vite development server:
-```bash
 npm run dev
 ```
-*The React Dashboard will be available at `http://localhost:5173`.*
 
 ---
 
-## 📅 Daily Implementation Log
+## 📅 Implementation Roadmap
 
-### Day 1: Project Architecture & Planning
-* **Objective:** Establish the project foundation and system architecture.
-* **Accomplishments:**
-  * Defined the overall project scope and requirements.
-  * Created the system architecture document and use-case workflows.
-  * Designed the frontend wireframe for the React Dashboard.
-  * Initialized the Python backend, set up SQLite via SQLAlchemy, and defined the `Interaction` database model.
+### Phase 1: MVP Core Pipeline
+* Built the React frontend and FastAPI backend framework.
+* Integrated OpenAI Whisper for transcription and basic VADER sentiment analysis.
+* Established local SQLite database structure.
 
-### Day 2: Backend Core Services
-* **Objective:** Build a modular, independently testable backend AI pipeline.
-* **Accomplishments:**
-  * Developed the `sentiment.py` module using VADER for offline NLP scoring.
-  * Developed the `speech_to_text.py` module utilizing OpenAI Whisper to transcribe `.wav` and `.mp3` files.
-  * Integrated both modules into a FastAPI application exposing a `/api/upload` endpoint.
-  * Configured local environment dependencies (including system `ffmpeg` for audio decoding).
-  * Validated the end-to-end data pipeline using automated API testing.
+### Phase 2: AI Enhancements & Authentication
+* Implemented speaker diarization using PyAnnote (distinguishing between Agent/Customer).
+* Upgraded sentiment analysis to HuggingFace Emotion RoBERTa for deep contextual understanding.
+* Added full user authentication (JWT tokens) and data silos.
+* Redesigned the UI with Dark Mode, Glassmorphism, and micro-animations.
 
-### Day 3: Frontend Dashboard & Integration
-* **Objective:** Build the user interface and integrate it with the backend API.
-* **Accomplishments:**
-  * Initialized a Vite + React application.
-  * Developed a premium UI using Vanilla CSS and modern grid layouts.
-  * Built interactive components: a drag-and-drop Audio Uploader, a dynamic Results Panel (with audio playback functionality), and a Database History table.
-  * Integrated the frontend `fetch` API to communicate directly with the FastAPI backend.
-  * Implemented a history deletion feature.
-  * **Result:** A stable, end-to-end minimum viable product (MVP) ready for demonstration.
-
----
-
-## 🔮 Future Work
-* Integrate live microphone capture directly from the browser using the `MediaRecorder` API.
-* Implement advanced analytics (e.g., aggregate sentiment trends over time).
-* Containerize the application using Docker for easier deployment.
+### Phase 3: Production Readiness (Current)
+* Fully containerized the stack using Docker and Docker Compose.
+* Migrated from ephemeral SQLite to a persistent PostgreSQL database using Docker Volumes.
+* Integrated pgAdmin for professional database administration.
+* Optimized build sizes by targeting CPU-only PyTorch and pinned dependencies to resolve security/compatibility conflicts.

@@ -20,3 +20,4 @@ pytest
 httpx
 pytest-asyncio
 email-validator
+psycopg2-binary

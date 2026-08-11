@@ -1,17 +1,45 @@
 version: '3.8'
 
 services:
+  # The Postgres Database Service
+  db:
+    image: postgres:15-alpine
+    container_name: vsi-postgres
+    environment:
+      POSTGRES_USER: vsi_user
+      POSTGRES_PASSWORD: vsi_password
+      POSTGRES_DB: voice_sentiment_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # pgAdmin Web Dashboard for Postgres
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: vsi-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+    restart: unless-stopped
+
   # The Backend Service (FastAPI)
   backend:
     build: ./backend
     container_name: vsi-backend
     ports:
       - "8000:8000"
+    depends_on:
+      - db
     # Optional: Mount the backend folder for live-reloading during development
     # volumes:
     #   - ./backend:/app
     environment:
       - ENV=production
+      - DATABASE_URL=postgresql://vsi_user:vsi_password@db:5432/voice_sentiment_db
     env_file:
       - ./backend/.env
     restart: unless-stopped
@@ -25,3 +53,6 @@ services:
     depends_on:
       - backend     # Ensure backend starts before frontend
     restart: unless-stopped
+
+volumes:
+  postgres_data:
