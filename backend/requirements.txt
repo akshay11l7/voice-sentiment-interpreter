@@ -15,7 +15,8 @@ torchaudio
 python-dotenv
 passlib[bcrypt]
 python-jose[cryptography]
-bcrypt
+bcrypt==3.2.2
 pytest
 httpx
 pytest-asyncio
+email-validator

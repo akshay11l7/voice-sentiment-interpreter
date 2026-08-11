@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  # The Backend Service (FastAPI)
+  backend:
+    build: ./backend
+    container_name: vsi-backend
+    ports:
+      - "8000:8000"
+    # Optional: Mount the backend folder for live-reloading during development
+    # volumes:
+    #   - ./backend:/app
+    environment:
+      - ENV=production
+    env_file:
+      - ./backend/.env
+    restart: unless-stopped
+
+  # The Frontend Service (React + Nginx)
+  frontend:
+    build: ./frontend
+    container_name: vsi-frontend
+    ports:
+      - "80:80"     # Map port 80 of the host to port 80 of the container
+    depends_on:
+      - backend     # Ensure backend starts before frontend
+    restart: unless-stopped
