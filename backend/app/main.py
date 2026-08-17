@@ -158,7 +158,6 @@ def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), d
 
         # 4. Align Whisper segments with Diarization and analyze sentiment per segment
         aligned_segments = []
-        context_buffer = []  # Keep track of up to 3 segments (2 context + 1 current)
         for w_seg in whisper_segments:
             w_start = w_seg["start"]
             w_end = w_seg["end"]
@@ -180,14 +179,8 @@ def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), d
                     max_overlap = overlap
                     best_speaker = d_seg["speaker"]
             
-            # Context-Windowing: Append current text, trim to max 3 items
-            context_buffer.append(w_text)
-            if len(context_buffer) > 3:
-                context_buffer.pop(0)
-            
-            # Analyze sentiment for this segment using the combined context
-            context_text = " ".join(context_buffer)
-            seg_sentiment = analyze_sentiment(context_text)
+            # Analyze sentiment for this segment directly to ensure speaker purity and prevent context dilution
+            seg_sentiment = analyze_sentiment(w_text)
             
             aligned_segments.append({
                 "speaker": best_speaker,
@@ -198,17 +191,51 @@ def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), d
                 "sentiment_score": seg_sentiment["score"]
             })
 
-        # 5. Calculate Metrics
-        overall_sentiment_result = analyze_sentiment(whisper_text)
+        # 5. Calculate Metrics using Segment-Weighted Sentiment to prevent dilution
+        EMOTION_SIGN_MAP = {
+            "Happy": 1.0,
+            "Surprise": 0.5,
+            "Neutral": 0.0,
+            "Sad": -1.0,
+            "Angry": -1.0,
+            "Fear": -0.8,
+            "Disgust": -0.8
+        }
         
         if aligned_segments:
-            total_score = sum(s["sentiment_score"] for s in aligned_segments)
-            avg_score = total_score / len(aligned_segments)
-        else:
-            avg_score = overall_sentiment_result["score"]
+            # Calculate average signed sentiment across all spoken segments
+            signed_scores = []
+            for s in aligned_segments:
+                label = s["sentiment"]
+                score = s["sentiment_score"]
+                sign = EMOTION_SIGN_MAP.get(label, 0.0)
+                signed_scores.append(sign * score)
             
-        # Map average score (-1.0 to 1.0) to a 1.0 - 10.0 scale for client satisfaction
-        client_satisfaction = round((avg_score + 1.0) * 4.5 + 1.0, 1)
+            avg_signed_score = sum(signed_scores) / len(aligned_segments)
+            
+            # Determine overall sentiment label based on the average signed score
+            if avg_signed_score < -0.15:
+                # Find the most common negative sentiment label among segments
+                neg_labels = [s["sentiment"] for s in aligned_segments if EMOTION_SIGN_MAP.get(s["sentiment"], 0.0) < 0]
+                overall_label = max(set(neg_labels), key=neg_labels.count) if neg_labels else "Angry"
+            elif avg_signed_score > 0.15:
+                # Find the most common positive sentiment label among segments
+                pos_labels = [s["sentiment"] for s in aligned_segments if EMOTION_SIGN_MAP.get(s["sentiment"], 0.0) > 0]
+                overall_label = max(set(pos_labels), key=pos_labels.count) if pos_labels else "Happy"
+            else:
+                overall_label = "Neutral"
+            
+            overall_score = abs(avg_signed_score)
+        else:
+            # Fallback if no segments are detected
+            overall_sentiment_result = analyze_sentiment(whisper_text)
+            overall_label = overall_sentiment_result["label"]
+            sign = EMOTION_SIGN_MAP.get(overall_label, 0.0)
+            avg_signed_score = sign * overall_sentiment_result["score"]
+            overall_score = overall_sentiment_result["score"]
+            
+        # Map average signed score (-1.0 to 1.0) to a 1.0 - 10.0 scale for client satisfaction
+        client_satisfaction = round((avg_signed_score + 1.0) * 4.5 + 1.0, 1)
         
         diarization_json = json.dumps(aligned_segments)
         
@@ -218,9 +245,9 @@ def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), d
             filename=file.filename,
             duration_seconds=0.0,
             transcription=whisper_text,
-            sentiment_score=avg_score,
-            sentiment_label=overall_sentiment_result["label"],
-            average_sentiment=avg_score,
+            sentiment_score=overall_score,
+            sentiment_label=overall_label,
+            average_sentiment=avg_signed_score,
             client_satisfaction=client_satisfaction,
             diarization_data=diarization_json
         )

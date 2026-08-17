@@ -87,3 +87,14 @@ export const getAuditLogs = async () => {
   }
   return await response.json();
 };
+
+export const fetchUserProfile = async () => {
+  const response = await fetch(`${API_BASE}/me`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch user profile: ${response.statusText}`);
+  }
+  return await response.json();
+};
+

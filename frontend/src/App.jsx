@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import Uploader from './components/Uploader';
 import ResultsPanel from './components/ResultsPanel';
 import HistoryList from './components/HistoryList';
-import { uploadAudio } from './api';
+import { uploadAudio, fetchUserProfile } from './api';
 import { LayoutDashboard, History, Settings, Search, Bell, LogOut } from 'lucide-react';
 import Toast from './components/Toast';
 import ThemeToggle from './components/ThemeToggle';
 import AuthPage from './components/AuthPage';
 import AuditLogs from './components/AuditLogs';
+import AllRecordings from './components/AllRecordings';
 import { ShieldAlert } from 'lucide-react';
 
 function App() {
@@ -18,6 +19,28 @@ function App() {
   const [toast, setToast] = useState({ message: '', type: '' });
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
   const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('isAuthenticated') === 'true');
+  const [userProfile, setUserProfile] = useState(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      const loadProfile = async () => {
+        try {
+          const profile = await fetchUserProfile();
+          setUserProfile(profile);
+        } catch (error) {
+          console.error("Failed to load user profile:", error);
+        }
+      };
+      loadProfile();
+    } else {
+      setUserProfile(null);
+      setIsSidebarOpen(false);
+    }
+  }, [isAuthenticated]);
+
+  const username = userProfile ? (userProfile.full_name || userProfile.email || 'User') : 'User';
+  const userInitial = username.charAt(0).toUpperCase();
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -66,7 +89,11 @@ function App() {
   return (
     <div className="app-container">
       {/* Sidebar */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${isSidebarOpen ? 'open' : 'closed'}`}>
+        <div className="sidebar-user-section">
+          <div className="sidebar-avatar">{userInitial}</div>
+          <div className="sidebar-username">{username}</div>
+        </div>
         <div className="brand">
           🎙️ AudioPro
         </div>
@@ -75,7 +102,7 @@ function App() {
             <LayoutDashboard size={20} />
             Dashboard
           </a>
-          <a href="#" className="nav-item">
+          <a href="#" className={`nav-item ${activeTab === 'recordings' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); setActiveTab('recordings'); }}>
             <History size={20} />
             All Recordings
           </a>
@@ -98,13 +125,29 @@ function App() {
       {/* Main Content */}
       <main className="main-content">
         <header className="header">
-          <h1>{activeTab === 'dashboard' ? 'Dashboard' : 'Activity Logs'}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <h1>{activeTab === 'dashboard' ? 'AudioPro' : activeTab === 'recordings' ? 'All Recordings' : 'Activity Logs'}</h1>
+          </div>
           <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
             <div className="search-bar">
               <Search size={18} color="var(--text-secondary)" />
               <input type="text" placeholder="Search interactions..." />
             </div>
             <Bell size={20} color="var(--text-secondary)" style={{cursor: 'pointer'}} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {isSidebarOpen && (
+                <span className="profile-greeting-text">
+                  Hi, {username}!
+                </span>
+              )}
+              <div 
+                className="profile-trigger" 
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                title={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
+              >
+                {userInitial}
+              </div>
+            </div>
           </div>
         </header>
 
@@ -124,6 +167,10 @@ function App() {
             <div>
               <ResultsPanel result={currentResult} audioUrl={currentAudioUrl} />
             </div>
+          </div>
+        ) : activeTab === 'recordings' ? (
+          <div className="recordings-view">
+            <AllRecordings refreshTrigger={refreshHistory} />
           </div>
         ) : activeTab === 'logs' ? (
           <div className="logs-view">
