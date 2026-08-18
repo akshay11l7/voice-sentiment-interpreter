@@ -36,9 +36,10 @@ The application is fully containerized for easy deployment and scalability.
 Once all containers are successfully running, you can access the following services in your browser:
 * **Web Application (React + Nginx):** `http://localhost`
 * **FastAPI Backend (Swagger API Docs):** `http://localhost:8000/docs`
-* **pgAdmin Database Dashboard:** `http://localhost:5050`
+* **pgAdmin Database Dashboard:** `http://localhost/pgadmin` (or `http://localhost:5050` if direct port access is enabled)
   * **Login Email:** `admin@admin.com`
   * **Password:** `admin`
+  * *Note: For access from a company laptop, use `http://10.20.41.36/pgadmin/` (if on the same LAN) or set up an SSH tunnel: `ssh -L 8080:localhost:80 pablo@10.20.41.36` and navigate to `http://localhost:8080/pgadmin/`.*
 
 ---
 

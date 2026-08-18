@@ -77,11 +77,15 @@ function App() {
   if (!isAuthenticated) {
     return (
       <div className="app-container">
-        <AuthPage onLogin={(token) => {
-          setIsAuthenticated(true);
-          localStorage.setItem('isAuthenticated', 'true');
-          localStorage.setItem('token', token);
-        }} />
+        <AuthPage 
+          theme={theme}
+          toggleTheme={toggleTheme}
+          onLogin={(token) => {
+            setIsAuthenticated(true);
+            localStorage.setItem('isAuthenticated', 'true');
+            localStorage.setItem('token', token);
+          }} 
+        />
       </div>
     );
   }
@@ -126,7 +130,17 @@ function App() {
       <main className="main-content">
         <header className="header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <h1>{activeTab === 'dashboard' ? 'AudioPro' : activeTab === 'recordings' ? 'All Recordings' : 'Activity Logs'}</h1>
+            <h1>
+              {activeTab === 'dashboard' ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <span>🎙️</span> AudioPro
+                </span>
+              ) : activeTab === 'recordings' ? (
+                'All Recordings'
+              ) : (
+                'Activity Logs'
+              )}
+            </h1>
           </div>
           <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
             <div className="search-bar">
