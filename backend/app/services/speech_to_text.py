@@ -5,13 +5,24 @@ import os
 # Suppress some common warnings from PyTorch/Whisper for a cleaner log
 warnings.filterwarnings("ignore", message="FP16 is not supported on CPU; using FP32 instead")
 
-print("Loading Whisper model (small) into memory... This may take a moment on first run.")
-# Load the model once when the module is imported
-# 'tiny' is used for speed. Can be changed to 'base' or 'small' for better accuracy.
-model = whisper.load_model("small")
-print("Whisper model loaded successfully.")
+import threading
 
-def transcribe_audio(file_path: str, task: str = "transcribe") -> dict:
+_models_cache = {}
+_cache_lock = threading.Lock()
+
+def get_whisper_model(model_name: str = "small"):
+    allowed_models = ["tiny", "base", "small", "medium"]
+    if model_name not in allowed_models:
+        model_name = "small"
+        
+    with _cache_lock:
+        if model_name not in _models_cache:
+            print(f"Loading Whisper model ({model_name}) into memory... This may take a moment on first run.")
+            _models_cache[model_name] = whisper.load_model(model_name)
+            print(f"Whisper model ({model_name}) loaded successfully.")
+        return _models_cache[model_name]
+
+def transcribe_audio(file_path: str, task: str = "transcribe", model_name: str = "small") -> dict:
     """
     Transcribes (or translates) an audio file at the given path using OpenAI Whisper.
     Returns the full transcription result dictionary containing text, segments, and timestamps.
@@ -19,8 +30,9 @@ def transcribe_audio(file_path: str, task: str = "transcribe") -> dict:
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"Audio file not found: {file_path}")
 
+    model_instance = get_whisper_model(model_name)
     # Transcribe or translate the audio file
-    result = model.transcribe(file_path, task=task)
+    result = model_instance.transcribe(file_path, task=task)
     return result
 
 if __name__ == "__main__":

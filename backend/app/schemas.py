@@ -5,9 +5,19 @@ from datetime import datetime
 class UserBase(BaseModel):
     email: EmailStr
     full_name: Optional[str] = None
+    whisper_model: Optional[str] = "small"
+    sentiment_model: Optional[str] = "j-hartmann/emotion-english-distilroberta-base"
+    enable_diarization: Optional[bool] = True
+    enable_noise_reduction: Optional[bool] = True
 
 class UserCreate(UserBase):
     password: str
+
+class UserSettingsUpdate(BaseModel):
+    whisper_model: str
+    sentiment_model: str
+    enable_diarization: bool
+    enable_noise_reduction: bool
 
 class UserResponse(UserBase):
     id: int

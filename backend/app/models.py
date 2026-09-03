@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
@@ -10,6 +10,10 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     full_name = Column(String, nullable=True)
+    whisper_model = Column(String, default="small", nullable=False)
+    sentiment_model = Column(String, default="j-hartmann/emotion-english-distilroberta-base", nullable=False)
+    enable_diarization = Column(Boolean, default=True, nullable=False)
+    enable_noise_reduction = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     interactions = relationship("Interaction", back_populates="owner")

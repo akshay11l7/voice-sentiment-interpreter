@@ -97,6 +97,34 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
 def read_users_me(current_user: models.User = Depends(get_current_user)):
     return current_user
 
+@app.put("/api/me/settings", response_model=schemas.UserResponse)
+def update_user_settings(
+    settings: schemas.UserSettingsUpdate, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    Updates configuration settings (Whisper model, Sentiment model, Diarization, Noise Reduction) for the authenticated user.
+    """
+    current_user.whisper_model = settings.whisper_model
+    current_user.sentiment_model = settings.sentiment_model
+    current_user.enable_diarization = settings.enable_diarization
+    current_user.enable_noise_reduction = settings.enable_noise_reduction
+    
+    db.commit()
+    db.refresh(current_user)
+    
+    # Audit log
+    log = models.AuditLog(
+        user_id=current_user.id, 
+        action_type="SETTINGS_UPDATE", 
+        description=f"Updated settings (Whisper: {settings.whisper_model}, Sentiment: {settings.sentiment_model})"
+    )
+    db.add(log)
+    db.commit()
+    
+    return current_user
+
 @app.post("/api/upload", response_model=schemas.InteractionResponse)
 def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """
@@ -127,34 +155,46 @@ def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), d
         file.file.close()
 
     try:
-        # 1.5 Apply noise reduction
-        clean_tmp_path = tmp_path.replace(suffix, f"_clean{suffix}") # Try to keep same suffix or .wav
-        try:
-            reduce_noise(tmp_path, clean_tmp_path)
-            process_path = clean_tmp_path
-        except Exception as e:
-            logger.warning(f"Noise reduction failed, proceeding with original audio: {e}")
+        # 1.5 Apply noise reduction if enabled
+        if current_user.enable_noise_reduction:
+            clean_tmp_path = tmp_path.replace(suffix, f"_clean{suffix}")
+            try:
+                reduce_noise(tmp_path, clean_tmp_path)
+                process_path = clean_tmp_path
+            except Exception as e:
+                logger.warning(f"Noise reduction failed, proceeding with original audio: {e}")
+                process_path = tmp_path
+        else:
+            logger.info("Noise reduction disabled by user settings.")
             process_path = tmp_path
 
-        # 2. Transcribe the audio (now returns full dict with segments)
-        transcription_result = transcribe_audio(process_path, task=task)
+        # 2. Transcribe the audio using the selected Whisper model
+        transcription_result = transcribe_audio(
+            process_path, 
+            task=task, 
+            model_name=current_user.whisper_model
+        )
         whisper_text = transcription_result["text"].strip()
         whisper_segments = transcription_result.get("segments", [])
 
-        # 3. Convert to WAV for diarization (PyAnnote needs precise sample counts)
-        wav_tmp_path = process_path.rsplit('.', 1)[0] + '_diarize.wav'
-        try:
-            import subprocess
-            subprocess.run(
-                ['ffmpeg', '-y', '-i', process_path, '-ar', '16000', '-ac', '1', wav_tmp_path],
-                capture_output=True, check=True
-            )
-            diarize_path = wav_tmp_path
-        except Exception as e:
-            logger.warning(f"WAV conversion for diarization failed, using original: {e}")
-            diarize_path = process_path
-        
-        diarization_result = diarize_audio(diarize_path)
+        # 3. Perform speaker diarization if enabled
+        diarization_result = []
+        if current_user.enable_diarization:
+            wav_tmp_path = process_path.rsplit('.', 1)[0] + '_diarize.wav'
+            try:
+                import subprocess
+                subprocess.run(
+                    ['ffmpeg', '-y', '-i', process_path, '-ar', '16000', '-ac', '1', wav_tmp_path],
+                    capture_output=True, check=True
+                )
+                diarize_path = wav_tmp_path
+            except Exception as e:
+                logger.warning(f"WAV conversion for diarization failed, using original: {e}")
+                diarize_path = process_path
+            
+            diarization_result = diarize_audio(diarize_path)
+        else:
+            logger.info("Speaker diarization disabled by user settings.")
 
         # 4. Align Whisper segments with Diarization and analyze sentiment per segment
         aligned_segments = []
@@ -167,20 +207,24 @@ def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), d
 
             best_speaker = "Unknown"
             max_overlap = 0
-            for d_seg in diarization_result:
-                d_start = d_seg["start"]
-                d_end = d_seg["end"]
-                
-                overlap_start = max(w_start, d_start)
-                overlap_end = min(w_end, d_end)
-                overlap = max(0, overlap_end - overlap_start)
-                
-                if overlap > max_overlap:
-                    max_overlap = overlap
-                    best_speaker = d_seg["speaker"]
+            if current_user.enable_diarization:
+                for d_seg in diarization_result:
+                    d_start = d_seg["start"]
+                    d_end = d_seg["end"]
+                    
+                    overlap_start = max(w_start, d_start)
+                    overlap_end = min(w_end, d_end)
+                    overlap = max(0, overlap_end - overlap_start)
+                    
+                    if overlap > max_overlap:
+                        max_overlap = overlap
+                        best_speaker = d_seg["speaker"]
             
-            # Analyze sentiment for this segment directly to ensure speaker purity and prevent context dilution
-            seg_sentiment = analyze_sentiment(w_text)
+            # Analyze sentiment for this segment using user's selected sentiment model
+            seg_sentiment = analyze_sentiment(
+                w_text, 
+                model_name=current_user.sentiment_model
+            )
             
             aligned_segments.append({
                 "speaker": best_speaker,
@@ -191,7 +235,7 @@ def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), d
                 "sentiment_score": seg_sentiment["score"]
             })
 
-        # 5. Calculate Metrics using Segment-Weighted Sentiment to prevent dilution
+        # 5. Calculate Metrics using Segment-Weighted Sentiment
         EMOTION_SIGN_MAP = {
             "Happy": 1.0,
             "Surprise": 0.5,
@@ -215,11 +259,9 @@ def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), d
             
             # Determine overall sentiment label based on the average signed score
             if avg_signed_score < -0.15:
-                # Find the most common negative sentiment label among segments
                 neg_labels = [s["sentiment"] for s in aligned_segments if EMOTION_SIGN_MAP.get(s["sentiment"], 0.0) < 0]
                 overall_label = max(set(neg_labels), key=neg_labels.count) if neg_labels else "Angry"
             elif avg_signed_score > 0.15:
-                # Find the most common positive sentiment label among segments
                 pos_labels = [s["sentiment"] for s in aligned_segments if EMOTION_SIGN_MAP.get(s["sentiment"], 0.0) > 0]
                 overall_label = max(set(pos_labels), key=pos_labels.count) if pos_labels else "Happy"
             else:
@@ -228,7 +270,10 @@ def upload_audio(file: UploadFile = File(...), task: str = Form("transcribe"), d
             overall_score = abs(avg_signed_score)
         else:
             # Fallback if no segments are detected
-            overall_sentiment_result = analyze_sentiment(whisper_text)
+            overall_sentiment_result = analyze_sentiment(
+                whisper_text, 
+                model_name=current_user.sentiment_model
+            )
             overall_label = overall_sentiment_result["label"]
             sign = EMOTION_SIGN_MAP.get(overall_label, 0.0)
             avg_signed_score = sign * overall_sentiment_result["score"]

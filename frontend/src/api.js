@@ -98,3 +98,21 @@ export const fetchUserProfile = async () => {
   return await response.json();
 };
 
+export const updateUserSettings = async (settings) => {
+  const response = await fetch(`${API_BASE}/me/settings`, {
+    method: "PUT",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(settings),
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || "Failed to update settings");
+  }
+  
+  return await response.json();
+};
+

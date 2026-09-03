@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { fetchHistory, deleteInteraction } from '../api';
 
-export default function HistoryList({ refreshTrigger }) {
+export default function HistoryList({ refreshTrigger, onViewAnalysis }) {
   const [history, setHistory] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [showTranscriptId, setShowTranscriptId] = useState(null);
@@ -127,15 +127,26 @@ export default function HistoryList({ refreshTrigger }) {
                           </div>
                         </>
                       ) : (
-                        <button 
-                          className="btn" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowTranscriptId(item.id);
-                          }}
-                        >
-                          Show Transcript
-                        </button>
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                          <button 
+                            className="btn" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowTranscriptId(item.id);
+                            }}
+                          >
+                            Show Transcript
+                          </button>
+                          <button 
+                            className="btn" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onViewAnalysis) onViewAnalysis(item);
+                            }}
+                          >
+                            Show Detailed Analysis
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>

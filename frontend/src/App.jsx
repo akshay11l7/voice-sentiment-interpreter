@@ -9,11 +9,13 @@ import ThemeToggle from './components/ThemeToggle';
 import AuthPage from './components/AuthPage';
 import AuditLogs from './components/AuditLogs';
 import AllRecordings from './components/AllRecordings';
+import SettingsPanel from './components/SettingsPanel';
 import { ShieldAlert } from 'lucide-react';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [currentResult, setCurrentResult] = useState(null);  const [currentAudioUrl, setCurrentAudioUrl] = useState(null);
+  const [currentResult, setCurrentResult] = useState(null);
+  const [currentAudioUrl, setCurrentAudioUrl] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [refreshHistory, setRefreshHistory] = useState(0);
   const [toast, setToast] = useState({ message: '', type: '' });
@@ -98,9 +100,6 @@ function App() {
           <div className="sidebar-avatar">{userInitial}</div>
           <div className="sidebar-username">{username}</div>
         </div>
-        <div className="brand">
-          🎙️ AudioPro
-        </div>
         <div className="nav-links">
           <a href="#" className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); setActiveTab('dashboard'); }}>
             <LayoutDashboard size={20} />
@@ -114,7 +113,7 @@ function App() {
             <ShieldAlert size={20} />
             Activity Logs
           </a>
-          <a href="#" className="nav-item">
+          <a href="#" className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); setActiveTab('settings'); }}>
             <Settings size={20} />
             Settings
           </a>
@@ -137,8 +136,10 @@ function App() {
                 </span>
               ) : activeTab === 'recordings' ? (
                 'All Recordings'
-              ) : (
+              ) : activeTab === 'logs' ? (
                 'Activity Logs'
+              ) : (
+                'Settings'
               )}
             </h1>
           </div>
@@ -174,7 +175,13 @@ function App() {
                 isUploading={isUploading} 
                 onError={showError} 
               />
-              <HistoryList refreshTrigger={refreshHistory} />
+              <HistoryList 
+                refreshTrigger={refreshHistory} 
+                onViewAnalysis={(item) => {
+                  setCurrentResult(item);
+                  setCurrentAudioUrl(null); // Clear audio url since we are viewing historical text
+                }}
+              />
             </div>
 
             {/* Right Column */}
@@ -189,6 +196,10 @@ function App() {
         ) : activeTab === 'logs' ? (
           <div className="logs-view">
             <AuditLogs />
+          </div>
+        ) : activeTab === 'settings' ? (
+          <div className="settings-view">
+            <SettingsPanel onError={showError} showSuccess={showSuccess} />
           </div>
         ) : null}
       </main>

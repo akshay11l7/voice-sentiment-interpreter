@@ -1,32 +1,63 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { PlayCircle, PauseCircle, Smile, Frown, Meh, Download, AlertCircle, AlertTriangle } from 'lucide-react';
+import WaveSurfer from 'wavesurfer.js';
 
 export default function ResultsPanel({ result, audioUrl }) {
   const [isPlaying, setIsPlaying] = useState(false);
-  const audioRef = useRef(null);
+  const [currentTime, setCurrentTime] = useState(0);
+  const waveformRef = useRef(null);
+  const wavesurferRef = useRef(null);
 
   useEffect(() => {
-    // Reset playing state if a new result comes in
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
+    if (!audioUrl || !waveformRef.current) return;
+
+    // Initialize WaveSurfer
+    const ws = WaveSurfer.create({
+      container: waveformRef.current,
+      waveColor: 'rgba(79, 70, 229, 0.4)',
+      progressColor: '#4f46e5',
+      cursorColor: '#1e1b4b', // Much darker stick
+      cursorWidth: 3,         // Thicker stick
+      barWidth: 2,
+      barGap: 3,
+      barRadius: 2,
+      height: 48,
+      normalize: true,
+      hideScrollbar: true,
+      interact: true,
+    });
+
+    wavesurferRef.current = ws;
+    ws.load(audioUrl);
+
+    ws.on('play', () => setIsPlaying(true));
+    ws.on('pause', () => setIsPlaying(false));
+    ws.on('finish', () => setIsPlaying(false));
+    ws.on('audioprocess', (time) => setCurrentTime(time));
+    ws.on('seek', () => setCurrentTime(ws.getCurrentTime()));
+
+    return () => {
+      ws.destroy();
+    };
+  }, [audioUrl]);
+
+  useEffect(() => {
+    // Reset states when a new result comes in
     setIsPlaying(false);
+    setCurrentTime(0);
   }, [result]);
 
   const togglePlay = () => {
-    if (!audioUrl || !audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current.play();
-      setIsPlaying(true);
+    if (wavesurferRef.current) {
+      wavesurferRef.current.playPause();
     }
   };
 
-  const handleEnded = () => {
-    setIsPlaying(false);
+  const seekToSegment = (start) => {
+    if (wavesurferRef.current) {
+      wavesurferRef.current.setTime(start);
+      wavesurferRef.current.play();
+    }
   };
 
   if (!result) {
@@ -107,23 +138,33 @@ export default function ResultsPanel({ result, audioUrl }) {
       <h2 className="panel-title">Analysis Results</h2>
       <p style={{ color: 'var(--text-secondary)', marginBottom: 24 }}>Result for: {filename}</p>
 
-      {/* Audio Player Fake Waveform */}
-      <h3 style={{ fontSize: 16, color: 'var(--text-secondary)', marginBottom: 8 }}>Audio Player</h3>
+      {/* Audio Player Waveform */}
+      <h3 style={{ fontSize: 16, color: 'var(--text-secondary)', marginBottom: 8 }}>Interactive Audio Player</h3>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 32 }}>
-        {audioUrl && <audio ref={audioRef} src={audioUrl} onEnded={handleEnded} style={{ display: 'none' }} />}
-        <div onClick={togglePlay} style={{ cursor: audioUrl ? 'pointer' : 'default', display: 'flex' }}>
+        <div onClick={togglePlay} style={{ cursor: audioUrl ? 'pointer' : 'default', display: 'flex', flexShrink: 0 }}>
           {isPlaying ? (
             <PauseCircle size={40} color="var(--accent-blue)" />
           ) : (
             <PlayCircle size={40} color={audioUrl ? "var(--accent-blue)" : "var(--text-secondary)"} />
           )}
         </div>
-        <div style={{ flex: 1, height: 40, backgroundImage: 'repeating-linear-gradient(90deg, var(--border-color), var(--border-color) 2px, transparent 2px, transparent 6px)', opacity: 0.5 }}></div>
+        <div 
+          style={{ 
+            flex: 1, 
+            minWidth: 0, 
+            backgroundColor: 'var(--bg-color)', 
+            padding: '12px 16px', 
+            borderRadius: '8px', 
+            border: '1px solid var(--border-color)',
+            boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
+          }} 
+          ref={waveformRef}
+        ></div>
         {audioUrl && (
           <a 
             href={audioUrl} 
             download={result.filename || "audio_recording.webm"} 
-            style={{ display: 'flex', cursor: 'pointer', marginLeft: 8 }} 
+            style={{ display: 'flex', cursor: 'pointer', marginLeft: 8, flexShrink: 0 }} 
             title="Download Audio"
           >
             <Download size={24} color="var(--text-secondary)" />
@@ -174,22 +215,34 @@ export default function ResultsPanel({ result, audioUrl }) {
       <h3 style={{ fontSize: 16, color: 'var(--text-secondary)', marginTop: 24, marginBottom: 8 }}>Conversation Transcript</h3>
       <div className="transcription-box" style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '400px', overflowY: 'auto' }}>
         {parsedDiarization.length > 0 ? (
-          parsedDiarization.map((segment, idx) => (
-            <div key={idx} style={{ 
+          parsedDiarization.map((segment, idx) => {
+            const isActive = currentTime >= segment.start && currentTime <= segment.end;
+            return (
+            <div 
+              key={idx} 
+              onClick={() => seekToSegment(segment.start)}
+              style={{ 
               padding: '12px', 
               borderRadius: '8px', 
-              backgroundColor: segment.speaker === 'SPEAKER_00' ? 'rgba(0, 112, 243, 0.1)' : 'var(--bg-color)',
-              border: '1px solid var(--border-color)',
+              backgroundColor: isActive ? 'rgba(79, 70, 229, 0.15)' : (segment.speaker === 'SPEAKER_00' ? 'rgba(0, 112, 243, 0.05)' : 'var(--bg-color)'),
+              border: isActive ? '1px solid var(--accent-blue)' : '1px solid var(--border-color)',
               alignSelf: segment.speaker === 'SPEAKER_00' ? 'flex-end' : 'flex-start',
-              width: '80%'
+              width: '80%',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              boxShadow: isActive ? '0 4px 12px rgba(79, 70, 229, 0.1)' : 'none'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '12px', color: 'var(--text-secondary)' }}>
                 <strong>{formatSpeakerName(segment.speaker)}</strong>
-                <span>{segment.sentiment} ({segment.sentiment_score.toFixed(2)})</span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <span>{new Date(segment.start * 1000).toISOString().substring(14, 19)}</span>
+                    <span>{segment.sentiment} ({segment.sentiment_score.toFixed(2)})</span>
+                </div>
               </div>
               <div style={{ lineHeight: '1.5' }}>{segment.text}</div>
             </div>
-          ))
+            );
+          })
         ) : (
           <div>{transcription || "No speech detected in this audio."}</div>
         )}
